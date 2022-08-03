@@ -1,0 +1,96 @@
+'Macro para Consultar dados de CNPJ através da url https://publica.cnpj.ws/cnpj
+'Adaptável para sistema Microsiga da TOTVS, mais informações em https://www.cnpj.ws
+'BAIXAR ANTES O CONVERSOR DE JSON PARA VBA, segue url onde encontrar mais informações: https://github.com/VBA-tools/VBA-JSON/blob/master/JsonConverter.bas
+
+Sub API_consultaCNPJ()
+Dim IEemJSON As Variant
+Dim objHTTP As Object
+
+If Range("B2") = "" Then
+
+MsgBox ("Por favor, preencha a célula B2 com o CNPJ a ser consultado e tente novamente.")
+Exit Sub
+
+End If
+
+    Set objHTTP = CreateObject("WinHttp.WinHttpRequest.5.1")
+
+    URL = "https://publica.cnpj.ws/cnpj/" + CStr(Range("B2"))
+
+    objHTTP.Open "GET", URL, False
+
+    objHTTP.Send
+
+    strResult = objHTTP.responseText
+
+    Set objetoJson = JsonConverter.ParseJson(strResult)
+
+    If objetoJson("titulo") = "Requisição inválida" Then
+        Range("B5:B12").ClearContents
+        MsgBox ("CNPJ Inválido")
+        objetoJson = ""
+        objetoJsonIE = ""
+        Exit Sub
+    End If
+
+    Range("A2") = "Insira o CNPJ:"
+    Range("A5") = "Resposta"
+    Range("B5") = strResult
+
+    If objetoJson("titulo") = "Muitas requisições" Then
+        MsgBox (objetoJson("detalhes"))
+        Exit Sub
+    End If
+
+    Range("A8:B11").NumberFormat = "@"
+
+    Range("A8") = "CNPJ"
+
+    Range("B8") = objetoJson("estabelecimento")("cnpj")
+
+    Range("A9") = "Razão Social"
+
+    Range("B9") = objetoJson("razao_social")
+
+    Range("A10") = "Inscrição Estadual"
+
+    Range("A11") = "Inscrição Estadual Ativa?"
+
+    IEemJSON = Mid(JsonConverter.ConvertToJson(objetoJson("estabelecimento")("inscricoes_estaduais")), 2, (Len(JsonConverter.ConvertToJson(objetoJson("estabelecimento")("inscricoes_estaduais"))) - 2))
+
+    If IEemJSON = "" Then
+            Range("B10") = "ISENTO"
+            Range("B11") = "Inativo"
+            Exit Sub
+    End If
+
+Set objetoJsonIE = JsonConverter.ParseJson(IEemJSON)
+
+Range("B10") = objetoJsonIE("inscricao_estadual")
+
+If objetoJsonIE("ativo") Then
+    Range("B11") = "Ativo"
+Else
+    Range("B11") = "Inativo"
+End If
+
+Dim data As Date
+
+data = DateValue(Mid(Replace(objetoJsonIE("atualizado_em"), "-", "/"), 1, 10))
+
+Range("A12") = "Dados Atualizados no Dia:"
+Range("B12") = data
+
+    With Range("B8:B12")
+        .HorizontalAlignment = xlLeft
+        .VerticalAlignment = xlBottom
+        .WrapText = False
+        .Orientation = 0
+        .AddIndent = False
+        .IndentLevel = 0
+        .ShrinkToFit = False
+        .ReadingOrder = xlContext
+        .MergeCells = False
+    End With
+
+End Sub
